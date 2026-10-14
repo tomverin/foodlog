@@ -60,8 +60,15 @@
         <!-- Calorie Big Display -->
         <div class="calorie-block">
           <div class="calorie-main">
-            <span id="valTotalCal" class="cal-number">0</span>
-            <span class="cal-unit">kcal</span>
+            <div class="cal-main-row">
+              <span id="valTotalCal" class="cal-number">0</span>
+              <span class="cal-unit">kcal mangées</span>
+            </div>
+            <div id="sportCalRow" class="sport-cal-row hidden">
+              <span class="sport-fire">🔥</span>
+              <span id="valSportCal" class="sport-number">0</span>
+              <span class="sport-unit">kcal brûlées</span>
+            </div>
           </div>
           <div class="calorie-remaining">
             <span id="valRemainingCal" class="rem-number">2 200</span>
@@ -153,13 +160,22 @@
             </div>
 
             <div class="form-row">
-              <label for="addMealType">Type de repas</label>
+              <label for="addMealType">Type d'entrée</label>
               <select id="addMealType" name="meal" required>
-                <option value="breakfast">🥐 Petit-déjeuner</option>
-                <option value="lunch" selected>🥗 Déjeuner</option>
-                <option value="snack">🍎 Collation</option>
-                <option value="dinner">🍲 Dîner</option>
-                <option value="other">☕ Autre</option>
+                <optgroup label="🍽️ Repas & Collations">
+                  <option value="breakfast">🥐 Petit-déjeuner</option>
+                  <option value="lunch" selected>🥗 Déjeuner</option>
+                  <option value="snack">🍎 Collation</option>
+                  <option value="dinner">🍲 Dîner</option>
+                  <option value="other">☕ Autre repas</option>
+                </optgroup>
+                <optgroup label="⚡ Dépense Sportive (Activité)">
+                  <option value="activity_ride">🚴 Sortie Vélo / Home Trainer</option>
+                  <option value="activity_run">🏃 Course à pied</option>
+                  <option value="activity_swim">🏊 Natation</option>
+                  <option value="activity_strength">💪 Musculation / Renfo</option>
+                  <option value="activity_other">⚡ Autre activité sportive</option>
+                </optgroup>
               </select>
             </div>
 

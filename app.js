@@ -44,6 +44,8 @@
   const elBtnToday = document.getElementById('btnToday');
 
   const elValTotalCal = document.getElementById('valTotalCal');
+  const elSportCalRow = document.getElementById('sportCalRow');
+  const elValSportCal = document.getElementById('valSportCal');
   const elValRemainingCal = document.getElementById('valRemainingCal');
   const elLblCalTarget = document.getElementById('lblCalTarget');
   const elCalProgressFill = document.getElementById('calProgressFill');
@@ -212,7 +214,8 @@
       saveConfig({ secret: appConfig.secret });
     }
 
-    const mealParam = params.get('meal') || params.get('type');
+    const actParam = params.get('activity') || params.get('sport');
+    const mealParam = actParam ? `activity_${actParam}` : (params.get('meal') || params.get('type'));
     const calParam = params.get('cal') || params.get('calories');
     const textParam = params.get('text') || params.get('desc') || params.get('items');
 
@@ -238,7 +241,7 @@
       time: timeParam,
       meal: mealType,
       title: titleParam,
-      text: textParam || 'Repas enregistré',
+      text: textParam || (isActivity({ meal: mealType }) ? 'Activité enregistrée' : 'Repas enregistré'),
       calories: calories,
       protein: isNaN(protParam) ? 0 : protParam,
       carbs: isNaN(carbsParam) ? 0 : carbsParam,
@@ -246,7 +249,7 @@
       synced: false,
     };
 
-    showToast('⏳ Enregistrement du repas en cours...', 'info');
+    showToast('⏳ Enregistrement en cours...', 'info');
 
     try {
       await sendMealToFirebase(newEntry);
@@ -254,7 +257,9 @@
       updateDateDisplay();
       await fetchMealsForDate(selectedDate);
 
-      showToast(`✅ ${getMealLabel(mealType)} enregistré (+${calories} kcal) !`, 'success');
+      const isAct = isActivity(newEntry);
+      const calLabel = isAct ? `-${calories} kcal dépense` : `+${calories} kcal`;
+      showToast(`✅ ${getMealLabel(mealType)} enregistré (${calLabel}) !`, 'success');
 
       // Clean URL query string without reloading page
       const cleanUrl = window.location.origin + window.location.pathname;
@@ -356,16 +361,24 @@
   // --- Rendering Functions ---
   function renderMeals(meals, date) {
     // 1. Calculate Totals
-    let totalCal = 0;
+    let totalIngested = 0;
+    let totalSportBurned = 0;
     let totalProt = 0;
     let totalCarbs = 0;
     let totalFat = 0;
 
     meals.forEach((m) => {
-      totalCal += Number(m.calories) || 0;
-      totalProt += Number(m.protein) || 0;
-      totalCarbs += Number(m.carbs) || 0;
-      totalFat += Number(m.fat) || 0;
+      const cal = Number(m.calories) || 0;
+      if (isActivity(m)) {
+        totalSportBurned += cal;
+        // Count intra-effort carbs if logged
+        totalCarbs += Number(m.carbs) || 0;
+      } else {
+        totalIngested += cal;
+        totalProt += Number(m.protein) || 0;
+        totalCarbs += Number(m.carbs) || 0;
+        totalFat += Number(m.fat) || 0;
+      }
     });
 
     totalProt = Math.round(totalProt * 10) / 10;
@@ -373,13 +386,24 @@
     totalFat = Math.round(totalFat * 10) / 10;
 
     // 2. Update Summary UI
-    elValTotalCal.textContent = formatNumber(totalCal);
-    const remainingCal = Math.max(0, appConfig.calTarget - totalCal);
+    elValTotalCal.textContent = formatNumber(totalIngested);
+
+    if (totalSportBurned > 0) {
+      elValSportCal.textContent = formatNumber(totalSportBurned);
+      elSportCalRow.classList.remove('hidden');
+      elLblCalTarget.innerHTML = `Base <strong>${formatNumber(appConfig.calTarget)}</strong> + Sport <strong style="color:#fb923c">${formatNumber(totalSportBurned)}</strong> = <strong>${formatNumber(appConfig.calTarget + totalSportBurned)}</strong> kcal`;
+    } else {
+      elSportCalRow.classList.add('hidden');
+      elLblCalTarget.textContent = formatNumber(appConfig.calTarget);
+    }
+
+    const dynamicTarget = appConfig.calTarget + totalSportBurned;
+    const remainingCal = Math.max(0, dynamicTarget - totalIngested);
     elValRemainingCal.textContent = formatNumber(remainingCal);
 
-    const calPct = Math.min(100, Math.round((totalCal / appConfig.calTarget) * 100));
+    const calPct = Math.min(100, Math.round((totalIngested / dynamicTarget) * 100));
     elCalProgressFill.style.width = `${calPct}%`;
-    if (totalCal > appConfig.calTarget) {
+    if (totalIngested > dynamicTarget) {
       elCalProgressFill.style.background = 'linear-gradient(90deg, #f59e0b, #ef4444)';
     } else {
       elCalProgressFill.style.background = 'linear-gradient(90deg, #0284c7, #38bdf8)';
@@ -397,7 +421,7 @@
     const carbsPct = Math.min(100, Math.round((totalCarbs / appConfig.carbsTarget) * 100));
     elBarCarbs.style.width = `${carbsPct}%`;
     const carbKcal = totalCarbs * 4;
-    const carbShare = totalCal > 0 ? Math.round((carbKcal / totalCal) * 100) : 0;
+    const carbShare = totalIngested > 0 ? Math.round((carbKcal / totalIngested) * 100) : 0;
     elRatioCarbs.textContent = `${carbShare}% des kcal`;
 
     // Fat
@@ -405,11 +429,13 @@
     const fatPct = Math.min(100, Math.round((totalFat / appConfig.fatTarget) * 100));
     elBarFat.style.width = `${fatPct}%`;
     const fatKcal = totalFat * 9;
-    const fatShare = totalCal > 0 ? Math.round((fatKcal / totalCal) * 100) : 0;
+    const fatShare = totalIngested > 0 ? Math.round((fatKcal / totalIngested) * 100) : 0;
     elRatioFat.textContent = `${fatShare}% des kcal`;
 
     // 3. Update Meal List
-    elMealsCount.textContent = `${meals.length} repas`;
+    const actCount = meals.filter(isActivity).length;
+    const mealCount = meals.length - actCount;
+    elMealsCount.textContent = actCount > 0 ? `${mealCount} repas · ${actCount} sport` : `${meals.length} repas`;
 
     if (meals.length === 0) {
       elMealsList.innerHTML = '';
@@ -432,10 +458,30 @@
     div.className = 'meal-item';
     div.dataset.mealId = meal.id;
 
+    const activity = isActivity(meal);
+    if (activity) {
+      div.classList.add('is-activity');
+    }
+
     const label = getMealLabel(meal.meal);
     const badgeClass = `badge-${meal.meal || 'other'}`;
     const timeStr = meal.time ? ` à ${meal.time}` : '';
     const titleStr = meal.title ? ` (${escapeHtml(meal.title)})` : '';
+
+    let chipsHtml = '';
+    if (activity) {
+      chipsHtml = `
+        <span class="macro-chip chip-burned">🔥 -${meal.calories || 0} kcal (dépense)</span>
+        ${meal.carbs ? `<span class="macro-chip chip-carbs">🥤 ${meal.carbs}g CHO intra-effort</span>` : ''}
+      `;
+    } else {
+      chipsHtml = `
+        <span class="macro-chip chip-cal">🔥 ${meal.calories || 0} kcal</span>
+        <span class="macro-chip chip-prot">🍗 ${meal.protein || 0}g P</span>
+        <span class="macro-chip chip-carbs">🍞 ${meal.carbs || 0}g G</span>
+        <span class="macro-chip chip-fat">🥑 ${meal.fat || 0}g L</span>
+      `;
+    }
 
     div.innerHTML = `
       <div class="meal-top">
@@ -449,12 +495,7 @@
         </div>
       </div>
       <div class="meal-desc">${escapeHtml(meal.text || '')}</div>
-      <div class="meal-chips">
-        <span class="macro-chip chip-cal">🔥 ${meal.calories || 0} kcal</span>
-        <span class="macro-chip chip-prot">🍗 ${meal.protein || 0}g P</span>
-        <span class="macro-chip chip-carbs">🍞 ${meal.carbs || 0}g G</span>
-        <span class="macro-chip chip-fat">🥑 ${meal.fat || 0}g L</span>
-      </div>
+      <div class="meal-chips">${chipsHtml}</div>
     `;
 
     // Delete handler
@@ -541,13 +582,20 @@
     currentMeals.forEach((m) => {
       const mealName = capitalizeFirst(m.meal || 'Repas');
       const title = m.title ? ` (${m.title})` : '';
-      const text = m.text || '';
       const cal = m.calories || 0;
-      const p = (m.protein || 0).toFixed(1);
-      const c = (m.carbs || 0).toFixed(1);
-      const f = (m.fat || 0).toFixed(1);
 
-      md += `${mealName}${title} : ${text} (~${cal} kcal, ${p}g prot, ${c}g gluc, ${f}g lip).\n`;
+      if (isActivity(m)) {
+        const actName = getMealLabel(m.meal).replace(/^[^\s]+\s+/, '');
+        const timePart = m.time ? `${m.time.replace(':', 'h')} - ` : '';
+        const prefix = (timePart || m.title) ? ` (${timePart}${m.title || ''})` : '';
+        md += `Dépense ${actName}${prefix} : ${text} (~${cal} kcal).\n`;
+      } else {
+        const mealName = capitalizeFirst(m.meal || 'Repas');
+        const p = (m.protein || 0).toFixed(1);
+        const c = (m.carbs || 0).toFixed(1);
+        const f = (m.fat || 0).toFixed(1);
+        md += `${mealName}${title} : ${text} (~${cal} kcal, ${p}g prot, ${c}g gluc, ${f}g lip).\n`;
+      }
     });
 
     navigator.clipboard
@@ -603,6 +651,26 @@
     });
 
     // Add Meal Modal
+    const selMealType = document.getElementById('addMealType');
+    const lblCal = document.querySelector('label[for="addMealCal"]');
+    const txtDesc = document.getElementById('addMealText');
+    const txtTitle = document.getElementById('addMealTitle');
+
+    function updateFormLabels() {
+      const val = selMealType.value;
+      if (val.startsWith('activity')) {
+        lblCal.textContent = 'Calories brûlées (dépense)';
+        txtDesc.placeholder = 'Ex: 18.5 km, 698m D+, NP 244W, 1h02';
+        txtTitle.placeholder = 'Ex: Col de Crozet 3x10\', Bois de Boulogne';
+      } else {
+        lblCal.textContent = 'Calories (kcal)';
+        txtDesc.placeholder = 'Ex: Blanc de poulet 220g, riz basmati 240g, brocolis, Skyr 150g';
+        txtTitle.placeholder = 'Ex: Maison, Pub Camden, Eurostar';
+      }
+    }
+
+    selMealType.addEventListener('change', updateFormLabels);
+
     elBtnOpenAddModal.addEventListener('click', () => {
       document.getElementById('addMealDate').value = selectedDate;
       document.getElementById('addMealTime').value = formatTimeNow();
@@ -612,6 +680,7 @@
       document.getElementById('addMealProt').value = '';
       document.getElementById('addMealCarbs').value = '';
       document.getElementById('addMealFat').value = '';
+      updateFormLabels();
       modalAddMeal.showModal();
     });
 
@@ -645,9 +714,12 @@
         synced: false,
       };
 
+      const isAct = isActivity(entry);
+      const msg = isAct ? `✅ ${getMealLabel(mealType)} enregistré (-${calVal} kcal) !` : `✅ ${getMealLabel(mealType)} ajouté !`;
+
       try {
         await sendMealToFirebase(entry);
-        showToast(`✅ ${getMealLabel(mealType)} ajouté !`, 'success');
+        showToast(msg, 'success');
       } catch (err) {
         saveLocalBackup(entry);
         showToast('⚠️ Hors ligne : sauvegardé en local', 'error');
@@ -711,8 +783,20 @@
   }
 
   // --- Utility Helpers ---
+  function isActivity(m) {
+    if (!m) return false;
+    const t = String(m.meal || m.type || '').toLowerCase();
+    return t.startsWith('activity') || t.includes('ride') || t.includes('run') || t.includes('swim') || t.includes('velo') || t.includes('sport') || t.includes('strength') || t.includes('renfo');
+  }
+
   function normalizeMealType(m) {
     const s = String(m || '').toLowerCase();
+    if (s.includes('ride') || s.includes('velo') || s.includes('bike')) return 'activity_ride';
+    if (s.includes('run') || s.includes('cap') || s.includes('course')) return 'activity_run';
+    if (s.includes('swim') || s.includes('nage') || s.includes('piscine')) return 'activity_swim';
+    if (s.includes('strength') || s.includes('renfo') || s.includes('muscu')) return 'activity_strength';
+    if (s.includes('activity') || s.includes('sport')) return 'activity_other';
+
     if (s.includes('break') || s.includes('petit') || s.includes('dej')) return 'breakfast';
     if (s.includes('snack') || s.includes('collat') || s.includes('gouter')) return 'snack';
     if (s.includes('din') || s.includes('souper')) return 'dinner';
@@ -722,13 +806,23 @@
 
   function getMealLabel(type) {
     const labels = {
-      breakfast: 'Petit-déjeuner',
-      lunch: 'Déjeuner',
-      snack: 'Collation',
-      dinner: 'Dîner',
-      other: 'Repas',
+      breakfast: '🥐 Petit-déjeuner',
+      lunch: '🥗 Déjeuner',
+      snack: '🍎 Collation',
+      dinner: '🍲 Dîner',
+      other: '🍽️ Repas',
+      activity_ride: '🚴 Vélo',
+      activity_run: '🏃 Course à pied',
+      activity_swim: '🏊 Natation',
+      activity_strength: '💪 Renfo / Muscu',
+      activity_other: '⚡ Activité sport',
+      ride: '🚴 Vélo',
+      run: '🏃 Course à pied',
+      swim: '🏊 Natation',
+      strength: '💪 Renfo / Muscu',
+      sport: '⚡ Activité sport',
     };
-    return labels[type] || 'Repas';
+    return labels[type] || (isActivity({ meal: type }) ? '⚡ Activité sport' : '🍽️ Repas');
   }
 
   function formatNumber(num) {

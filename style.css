@@ -304,6 +304,26 @@ body {
   align-items: baseline;
   margin-bottom: 12px;
 }
+.cal-main-row {
+  display: flex;
+  align-items: baseline;
+}
+.sport-cal-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #fb923c;
+  font-weight: 700;
+  margin-top: 2px;
+}
+.sport-cal-row.hidden {
+  display: none;
+}
+.sport-number {
+  font-size: 16px;
+  color: #f97316;
+}
 .cal-number {
   font-size: 42px;
   font-weight: 800;
@@ -311,10 +331,10 @@ body {
   color: var(--color-calories);
 }
 .cal-unit {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-secondary);
-  margin-left: 4px;
+  margin-left: 6px;
 }
 .calorie-remaining {
   text-align: right;
@@ -473,6 +493,24 @@ body {
 .badge-snack { background: #831843; color: #fce7f3; }
 .badge-dinner { background: #1e3a8a; color: #dbeafe; }
 .badge-other { background: #374151; color: #f3f4f6; }
+
+/* Activités Sportives */
+.badge-activity_ride, .badge-ride { background: #7c2d12; color: #ffedd5; }
+.badge-activity_run, .badge-run { background: #831843; color: #fce7f3; }
+.badge-activity_swim, .badge-swim { background: #0c4a6e; color: #e0f2fe; }
+.badge-activity_strength, .badge-strength { background: #4c1d95; color: #ede9fe; }
+.badge-activity_other, .badge-activity { background: #9a3412; color: #ffedd5; }
+
+.meal-item.is-activity {
+  border-left: 3px solid #f97316;
+  background: linear-gradient(90deg, rgba(249, 115, 22, 0.08), var(--bg-card));
+}
+.macro-chip.chip-burned {
+  color: #fb923c;
+  border-color: rgba(249, 115, 22, 0.4);
+  background: rgba(249, 115, 22, 0.12);
+  font-weight: 700;
+}
 
 .meal-meta {
   display: flex;
