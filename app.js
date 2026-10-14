@@ -8,7 +8,7 @@
 
   // --- Constants & Default Configuration ---
   const DEFAULT_CONFIG = {
-    dbUrl: 'https://foodlog-tom-default-rtdb.europe-west1.firebasedatabase.app',
+    dbUrl: 'https://tom-foodlog-default-rtdb.europe-west1.firebasedatabase.app',
     secret: 'tom-foodlog-2026',
     calTarget: 2200,
     protTarget: 150,
