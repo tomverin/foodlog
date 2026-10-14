@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Foodlog & Nutrition — Tom</title>
+  <meta name="description" content="Dashboard nutritionnel quotidien et enregistrement rapide pour Tom">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Bar -->
+    <header class="app-header">
+      <div class="header-left">
+        <span class="app-logo">🥗</span>
+        <div class="header-titles">
+          <h1>Foodlog</h1>
+          <span id="connectionBadge" class="status-badge checking">Connexion...</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="btnRefresh" class="icon-btn" title="Actualiser" aria-label="Actualiser">🔄</button>
+        <button id="btnCopyMd" class="icon-btn" title="Copier en Markdown" aria-label="Copier en Markdown">📋</button>
+        <button id="btnSettings" class="icon-btn" title="Paramètres" aria-label="Paramètres">⚙️</button>
+      </div>
+    </header>
+
+    <!-- Toast / Notification Banner -->
+    <div id="toastNotification" class="toast hidden" role="alert" aria-live="polite">
+      <span id="toastIcon">✅</span>
+      <span id="toastMsg">Repas enregistré avec succès !</span>
+      <button id="toastClose" class="toast-close" aria-label="Fermer">✕</button>
+    </div>
+
+    <!-- Date Navigator -->
+    <nav class="date-navigator" aria-label="Navigation par date">
+      <button id="btnPrevDay" class="nav-arrow" aria-label="Jour précédent">‹</button>
+      <div class="current-date-display">
+        <input type="date" id="datePicker" class="date-input" aria-label="Sélectionner une date">
+        <div id="dateLabel" class="date-label">Aujourd'hui</div>
+      </div>
+      <button id="btnNextDay" class="nav-arrow" aria-label="Jour suivant">›</button>
+      <button id="btnToday" class="today-chip">Aujourd'hui</button>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Nutrition Summary Card -->
+      <section class="summary-card" aria-labelledby="summaryTitle">
+        <div class="summary-header">
+          <h2 id="summaryTitle">Bilan Nutritionnel</h2>
+          <span id="targetStatus" class="target-chip">Objectif : <strong id="lblCalTarget">2 200</strong> kcal</span>
+        </div>
+
+        <!-- Calorie Big Display -->
+        <div class="calorie-block">
+          <div class="calorie-main">
+            <span id="valTotalCal" class="cal-number">0</span>
+            <span class="cal-unit">kcal</span>
+          </div>
+          <div class="calorie-remaining">
+            <span id="valRemainingCal" class="rem-number">2 200</span>
+            <span class="rem-label">restantes</span>
+          </div>
+        </div>
+
+        <!-- Calorie Progress Bar -->
+        <div class="progress-track" role="progressbar" id="calProgressBar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="2200">
+          <div id="calProgressFill" class="progress-fill" style="width: 0%;"></div>
+        </div>
+
+        <!-- Macros Grid -->
+        <div class="macros-grid">
+          <!-- Protéines -->
+          <div class="macro-card protein-card">
+            <div class="macro-header">
+              <span class="macro-name">🍗 Protéines</span>
+              <span class="macro-target"><strong id="valProt">0</strong> / <span id="lblProtTarget">150</span>g</span>
+            </div>
+            <div class="macro-bar-track">
+              <div id="barProt" class="macro-bar-fill protein-fill" style="width: 0%;"></div>
+            </div>
+            <span id="ratioProt" class="macro-sub">0.0 g/kg (77.4 kg)</span>
+          </div>
+
+          <!-- Glucides -->
+          <div class="macro-card carbs-card">
+            <div class="macro-header">
+              <span class="macro-name">🍞 Glucides</span>
+              <span class="macro-target"><strong id="valCarbs">0</strong> / <span id="lblCarbsTarget">260</span>g</span>
+            </div>
+            <div class="macro-bar-track">
+              <div id="barCarbs" class="macro-bar-fill carbs-fill" style="width: 0%;"></div>
+            </div>
+            <span id="ratioCarbs" class="macro-sub">0% de l'apport</span>
+          </div>
+
+          <!-- Lipides -->
+          <div class="macro-card fat-card">
+            <div class="macro-header">
+              <span class="macro-name">🥑 Lipides</span>
+              <span class="macro-target"><strong id="valFat">0</strong> / <span id="lblFatTarget">60</span>g</span>
+            </div>
+            <div class="macro-bar-track">
+              <div id="barFat" class="macro-bar-fill fat-fill" style="width: 0%;"></div>
+            </div>
+            <span id="ratioFat" class="macro-sub">0% de l'apport</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Meals Timeline -->
+      <section class="meals-section" aria-labelledby="mealsTitle">
+        <div class="section-header">
+          <h2 id="mealsTitle">Repas du Jour</h2>
+          <span id="mealsCount" class="badge">0 repas</span>
+        </div>
+
+        <!-- Meal List Container -->
+        <div id="mealsList" class="meals-list">
+          <div class="empty-state" id="emptyState">
+            <span class="empty-icon">🍽️</span>
+            <p>Aucun repas enregistré pour cette journée.</p>
+            <p class="empty-sub">Utilise le bouton <strong>+</strong> ci-dessous ou envoie un repas depuis Gemini Web.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Floating Action Button -->
+    <button id="btnOpenAddModal" class="fab-btn" title="Ajouter un repas" aria-label="Ajouter un repas">+</button>
+
+    <!-- Modal Dialog: Quick Add Meal -->
+    <dialog id="modalAddMeal" class="app-dialog">
+      <form id="formAddMeal" method="dialog" class="dialog-form">
+        <div class="dialog-header">
+          <h3>Ajouter un Repas</h3>
+          <button type="button" class="btn-close-dialog" id="btnCloseAddModal" aria-label="Fermer">✕</button>
+        </div>
+
+        <div class="dialog-body">
+          <fieldset class="form-fieldset">
+            <legend class="sr-only">Détails du repas</legend>
+
+            <div class="form-row">
+              <label for="addMealDate">Date</label>
+              <input type="date" id="addMealDate" name="date" required>
+            </div>
+
+            <div class="form-row">
+              <label for="addMealType">Type de repas</label>
+              <select id="addMealType" name="meal" required>
+                <option value="breakfast">🥐 Petit-déjeuner</option>
+                <option value="lunch" selected>🥗 Déjeuner</option>
+                <option value="snack">🍎 Collation</option>
+                <option value="dinner">🍲 Dîner</option>
+                <option value="other">☕ Autre</option>
+              </select>
+            </div>
+
+            <div class="form-row">
+              <label for="addMealTime">Heure</label>
+              <input type="time" id="addMealTime" name="time">
+            </div>
+
+            <div class="form-row">
+              <label for="addMealTitle">Titre / Lieu (optionnel)</label>
+              <input type="text" id="addMealTitle" name="title" placeholder="Ex: Maison, Pub Camden, Eurostar">
+            </div>
+
+            <div class="form-row">
+              <label for="addMealText">Description & Ingrédients</label>
+              <textarea id="addMealText" name="text" rows="3" required placeholder="Ex: Blanc de poulet 220g, riz basmati 240g, brocolis, Skyr 150g"></textarea>
+            </div>
+
+            <div class="form-macros-row">
+              <div class="macro-input-group">
+                <label for="addMealCal">Calories (kcal)</label>
+                <input type="number" id="addMealCal" name="calories" min="0" max="5000" step="1" required placeholder="875">
+              </div>
+              <div class="macro-input-group">
+                <label for="addMealProt">Protéines (g)</label>
+                <input type="number" id="addMealProt" name="protein" min="0" max="300" step="0.1" placeholder="80">
+              </div>
+              <div class="macro-input-group">
+                <label for="addMealCarbs">Glucides (g)</label>
+                <input type="number" id="addMealCarbs" name="carbs" min="0" max="600" step="0.1" placeholder="105">
+              </div>
+              <div class="macro-input-group">
+                <label for="addMealFat">Lipides (g)</label>
+                <input type="number" id="addMealFat" name="fat" min="0" max="300" step="0.1" placeholder="14">
+              </div>
+            </div>
+          </fieldset>
+        </div>
+
+        <div class="dialog-footer">
+          <button type="button" class="btn-secondary" id="btnCancelAdd">Annuler</button>
+          <button type="submit" class="btn-primary" id="btnSubmitAdd">Enregistrer le repas</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Modal Dialog: Settings -->
+    <dialog id="modalSettings" class="app-dialog">
+      <form id="formSettings" method="dialog" class="dialog-form">
+        <div class="dialog-header">
+          <h3>⚙️ Configuration & Base Firebase</h3>
+          <button type="button" class="btn-close-dialog" id="btnCloseSettingsModal" aria-label="Fermer">✕</button>
+        </div>
+
+        <div class="dialog-body">
+          <fieldset class="form-fieldset">
+            <legend>Connexion Firebase Realtime Database</legend>
+            <p class="fieldset-help">Entrez l'URL de votre base Firebase dédiée (Europe-West1).</p>
+
+            <div class="form-row">
+              <label for="cfgDbUrl">URL Firebase Realtime Database</label>
+              <input type="url" id="cfgDbUrl" name="dbUrl" required placeholder="https://foodlog-tom-default-rtdb.europe-west1.firebasedatabase.app">
+            </div>
+
+            <div class="form-row">
+              <label for="cfgSecret">Clé secrète / Room ID</label>
+              <input type="text" id="cfgSecret" name="secret" required placeholder="tom-foodlog-2026">
+              <small class="field-hint">Ce jeton protège le chemin /foodlog/{clé}/ dans la base.</small>
+            </div>
+
+            <div class="form-actions-inline">
+              <button type="button" id="btnTestConn" class="btn-secondary btn-sm">Tester la connexion</button>
+              <span id="testConnResult" class="test-result"></span>
+            </div>
+          </fieldset>
+
+          <fieldset class="form-fieldset">
+            <legend>Objectifs Journaliers (Phase 2 Affûtage)</legend>
+            <div class="form-macros-row">
+              <div class="macro-input-group">
+                <label for="cfgCalTarget">Cible Calories</label>
+                <input type="number" id="cfgCalTarget" name="calTarget" min="1500" max="4500" step="50" value="2200">
+              </div>
+              <div class="macro-input-group">
+                <label for="cfgProtTarget">Cible Protéines (g)</label>
+                <input type="number" id="cfgProtTarget" name="protTarget" min="50" max="300" step="5" value="150">
+              </div>
+              <div class="macro-input-group">
+                <label for="cfgCarbsTarget">Cible Glucides (g)</label>
+                <input type="number" id="cfgCarbsTarget" name="carbsTarget" min="50" max="600" step="10" value="260">
+              </div>
+              <div class="macro-input-group">
+                <label for="cfgFatTarget">Cible Lipides (g)</label>
+                <input type="number" id="cfgFatTarget" name="fatTarget" min="20" max="150" step="5" value="60">
+              </div>
+            </div>
+          </fieldset>
+        </div>
+
+        <div class="dialog-footer">
+          <button type="button" class="btn-secondary" id="btnCancelSettings">Fermer</button>
+          <button type="submit" class="btn-primary" id="btnSaveSettings">Sauvegarder</button>
+        </div>
+      </form>
+    </dialog>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

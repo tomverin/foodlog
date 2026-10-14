@@ -1,0 +1,16 @@
+{
+  "name": "Foodlog & Nutrition — Tom",
+  "short_name": "Foodlog",
+  "description": "Suivi des repas et macros en temps réel",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#090d16",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
