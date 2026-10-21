@@ -27,6 +27,7 @@
   let appConfig = loadConfig();
   let selectedDate = getTodayIso();
   let currentMeals = [];
+  let mealsRequestId = 0;
 
   // --- DOM Elements ---
   const elConnectionBadge = document.getElementById('connectionBadge');
@@ -348,14 +349,18 @@
   }
 
   async function fetchMealsForDate(date) {
+    const requestId = ++mealsRequestId;
+    const isCurrentRequest = () => requestId === mealsRequestId && date === selectedDate;
     showConnectionStatus('checking', 'Chargement...');
     const url = `${getBaseSecretPath()}/days/${date}.json`;
 
     try {
       const resp = await fetch(url, { cache: 'no-store' });
+      if (!isCurrentRequest()) return;
       if (!resp.ok) {
         if (resp.status === 404) {
           showConnectionStatus('error', 'Base non trouvée (404)');
+          currentMeals = [];
           renderMeals([], date);
           return;
         }
@@ -363,6 +368,7 @@
       }
 
       const data = await resp.json();
+      if (!isCurrentRequest()) return;
       const meals = [];
 
       if (data && typeof data === 'object') {
@@ -395,6 +401,7 @@
       showConnectionStatus('connected', 'Connecté');
       renderMeals(meals, date);
     } catch (err) {
+      if (!isCurrentRequest()) return;
       console.warn('Could not fetch from Firebase:', err);
       showConnectionStatus('error', 'Non connecté');
       // Load offline meals
@@ -494,12 +501,12 @@
     elMealsList.innerHTML = '';
 
     meals.forEach((m) => {
-      const card = createMealCard(m);
+      const card = createMealCard(m, date);
       elMealsList.appendChild(card);
     });
   }
 
-  function createMealCard(meal) {
+  function createMealCard(meal, date) {
     const div = document.createElement('article');
     div.className = 'meal-item';
     div.dataset.mealId = meal.id;
@@ -537,25 +544,65 @@
         </div>
         <div class="meal-meta">
           <span>${timeStr}</span>
-          <button class="meal-del-btn" title="Supprimer" aria-label="Supprimer ce repas">🗑️</button>
+          <button type="button" class="meal-del-btn" title="Supprimer" aria-label="Supprimer cette entrée" aria-expanded="false">🗑️</button>
         </div>
       </div>
       <div class="meal-desc">${escapeHtml(meal.text || '')}</div>
       <div class="meal-chips">${chipsHtml}</div>
+      <div class="meal-delete-confirmation" hidden>
+        <p>Supprimer cette entrée ?</p>
+        <div class="meal-delete-actions">
+          <button type="button" class="btn-secondary meal-delete-cancel">Annuler</button>
+          <button type="button" class="btn-danger meal-delete-confirm">Supprimer</button>
+        </div>
+        <p class="meal-delete-error" role="alert" hidden></p>
+      </div>
     `;
 
-    // Delete handler
+    // Keep confirmation and errors in the page: embedded browsers may ignore
+    // native confirm()/alert() dialogs. Capture the card's date, not the picker.
     const delBtn = div.querySelector('.meal-del-btn');
-    delBtn.addEventListener('click', async () => {
-      if (confirm(`Supprimer ${label} ?`)) {
-        try {
-          await deleteMealFromFirebase(selectedDate, meal.id);
-          removeLocalBackup(meal.id);
-          showToast('Repas supprimé', 'info');
-          fetchMealsForDate(selectedDate);
-        } catch (e) {
-          alert('Erreur lors de la suppression : ' + e.message);
-        }
+    const confirmation = div.querySelector('.meal-delete-confirmation');
+    const cancelBtn = div.querySelector('.meal-delete-cancel');
+    const confirmBtn = div.querySelector('.meal-delete-confirm');
+    const error = div.querySelector('.meal-delete-error');
+    let deleting = false;
+
+    delBtn.addEventListener('click', () => {
+      confirmation.hidden = false;
+      delBtn.setAttribute('aria-expanded', 'true');
+      cancelBtn.focus();
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      if (deleting) return;
+      confirmation.hidden = true;
+      error.hidden = true;
+      delBtn.setAttribute('aria-expanded', 'false');
+      delBtn.focus();
+    });
+
+    confirmBtn.addEventListener('click', async () => {
+      if (deleting) return;
+      deleting = true;
+      error.hidden = true;
+      delBtn.disabled = cancelBtn.disabled = confirmBtn.disabled = true;
+      confirmBtn.textContent = 'Suppression…';
+      confirmation.setAttribute('aria-busy', 'true');
+
+      try {
+        await deleteMealFromFirebase(date, meal.id);
+        removeLocalBackup(meal.id, date);
+        showToast('Entrée supprimée', 'info');
+        if (selectedDate === date) await fetchMealsForDate(date);
+      } catch (e) {
+        error.textContent = 'Suppression impossible. Vérifie ta connexion puis réessaie. (' + e.message + ')';
+        error.hidden = false;
+      } finally {
+        deleting = false;
+        delBtn.disabled = cancelBtn.disabled = confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Supprimer';
+        confirmation.removeAttribute('aria-busy');
       }
     });
 
@@ -582,8 +629,8 @@
     }
   }
 
-  function removeLocalBackup(id) {
-    const list = getLocalBackups().filter((m) => m.id !== id);
+  function removeLocalBackup(id, date) {
+    const list = getLocalBackups().filter((m) => m.id !== id || m.date !== date);
     try {
       localStorage.setItem(STORAGE_KEYS.LOCAL_ENTRIES, JSON.stringify(list));
     } catch (e) {

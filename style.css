@@ -525,10 +525,44 @@ body {
   color: var(--text-muted);
   cursor: pointer;
   font-size: 14px;
-  padding: 2px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
 }
 .meal-del-btn:hover {
   color: var(--color-danger);
+}
+
+.meal-delete-confirmation {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+}
+.meal-delete-confirmation[hidden], .meal-delete-error[hidden] {
+  display: none;
+}
+.meal-delete-confirmation p {
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+.meal-delete-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.meal-delete-actions button {
+  min-height: 44px;
+}
+.meal-delete-confirmation .meal-delete-error {
+  margin: 12px 0 0;
+  color: var(--color-danger);
+  overflow-wrap: anywhere;
+}
+.meal-item button:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .meal-desc {
@@ -734,7 +768,7 @@ body {
   font-size: 14px;
 }
 
-.btn-primary, .btn-secondary {
+.btn-primary, .btn-secondary, .btn-danger {
   padding: 10px 18px;
   border-radius: var(--radius-sm);
   font-size: 14px;
@@ -749,6 +783,14 @@ body {
 }
 .btn-primary:hover {
   background: #1d4ed8;
+}
+.btn-danger {
+  background: #b91c1c;
+  border: 1px solid #ef4444;
+  color: #ffffff;
+}
+.btn-danger:hover {
+  background: #991b1b;
 }
 .btn-secondary {
   background: var(--bg-tertiary);
