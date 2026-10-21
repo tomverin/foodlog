@@ -20,6 +20,7 @@
   const STORAGE_KEYS = {
     CONFIG: 'tom_foodlog_cfg',
     LOCAL_ENTRIES: 'tom_foodlog_local_backup',
+    PENDING_LOG: 'tom_foodlog_pending_payload',
   };
 
   // --- State ---
@@ -202,7 +203,40 @@
 
   // --- Publish Handler (from URL Query Parameters) ---
   async function handleUrlPublish() {
-    const params = new URLSearchParams(window.location.search);
+    let search = window.location.search;
+
+    // Check if current URL contains publish payload
+    const testParams = new URLSearchParams(search);
+    const hasPayloadInUrl = Boolean(
+      testParams.get('meal') ||
+      testParams.get('type') ||
+      testParams.get('activity') ||
+      testParams.get('sport') ||
+      testParams.get('cal') ||
+      testParams.get('calories') ||
+      testParams.get('text') ||
+      testParams.get('desc') ||
+      testParams.get('items')
+    );
+
+    if (hasPayloadInUrl) {
+      // 1. Immediate Backup of payload to localStorage before any network / auth call
+      try {
+        localStorage.setItem(STORAGE_KEYS.PENDING_LOG, search);
+      } catch (e) {
+        console.warn('Could not store pending_log in localStorage', e);
+      }
+    } else {
+      // 2. Check if a pending log was saved earlier (e.g. redirected or transferred from in-app to Safari)
+      const savedPending = localStorage.getItem(STORAGE_KEYS.PENDING_LOG);
+      if (savedPending) {
+        search = savedPending;
+      } else {
+        return false; // Regular visit, no publish payload
+      }
+    }
+
+    const params = new URLSearchParams(search);
 
     // Support override of db/token via url if present
     if (params.get('db')) {
@@ -253,6 +287,14 @@
 
     try {
       await sendMealToFirebase(newEntry);
+
+      // Successfully synced: clear pending payload from localStorage
+      try {
+        localStorage.removeItem(STORAGE_KEYS.PENDING_LOG);
+      } catch (e) {
+        // ignore
+      }
+
       selectedDate = dateParam;
       updateDateDisplay();
       await fetchMealsForDate(selectedDate);
@@ -261,7 +303,7 @@
       const calLabel = isAct ? `-${calories} kcal dépense` : `+${calories} kcal`;
       showToast(`✅ ${getMealLabel(mealType)} enregistré (${calLabel}) !`, 'success');
 
-      // Clean URL query string without reloading page
+      // Clean URL query string ONLY after successful sync
       const cleanUrl = window.location.origin + window.location.pathname;
       window.history.replaceState({}, document.title, cleanUrl);
       return true;
@@ -273,6 +315,10 @@
       updateDateDisplay();
       await fetchMealsForDate(selectedDate);
       showToast(`⚠️ Hors ligne : sauvegardé en local (+${calories} kcal)`, 'error');
+
+      // CRITICAL FOR IOS: DO NOT strip query string with replaceState on failure!
+      // Leaving the URL intact allows the user to tap [↗] "Ouvrir dans Safari"
+      // to cleanly hand off the exact parameters with all data preserved.
       return true;
     }
   }
