@@ -12,3 +12,4 @@ Dashboard nutritionnel quotidien mobile-first et passerelle d'enregistrement dir
   ```
 - **Export Markdown** : Copie en 1 clic au format exact de `foodlog.md` pour synchronisation locale.
 - **Configuration** : Bouton ⚙️ pour personnaliser l'URL Firebase RTDB et la clé de salle secrète.
+- **Résilience iOS / Safari** : Sauvegarde automatique du payload dans `localStorage` (`tom_foodlog_pending_payload`) et conservation de l'URL query string en cas d'ouverture dans une WebView intégrée pour permettre le transfert propre vers Safari via `[↗]`.
