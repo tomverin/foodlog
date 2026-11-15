@@ -97,6 +97,33 @@ body {
   font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.5px;
+  margin: 0;
+}
+
+.title-with-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.profile-select {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.profile-select:hover,
+.profile-select:focus {
+  border-color: var(--color-primary);
+  background: var(--bg-tertiary);
 }
 
 .status-badge {

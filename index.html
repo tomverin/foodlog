@@ -14,7 +14,7 @@
   <link rel="shortcut icon" href="favicon.ico?v=2">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2">
   <link rel="manifest" href="manifest.json?v=2">
-  <link rel="stylesheet" href="style.css?v=20261021-delete">
+  <link rel="stylesheet" href="style.css?v=20261115-multiprofile">
 </head>
 <body>
   <div class="app-container">
@@ -23,7 +23,13 @@
       <div class="header-left">
         <span class="app-logo">🥗</span>
         <div class="header-titles">
-          <h1>Foodlog</h1>
+          <div class="title-with-profile">
+            <h1>Foodlog</h1>
+            <select id="profileSelect" class="profile-select" aria-label="Profil actif">
+              <option value="tom">👤 Tom</option>
+              <option value="murielle">👤 Murielle</option>
+            </select>
+          </div>
           <span id="connectionBadge" class="status-badge checking">Connexion...</span>
         </div>
       </div>
@@ -257,23 +263,27 @@
           </fieldset>
 
           <fieldset class="form-fieldset">
-            <legend>Objectifs Journaliers (Phase 2 Affûtage)</legend>
+            <legend>Objectifs Journaliers</legend>
             <div class="form-macros-row">
               <div class="macro-input-group">
                 <label for="cfgCalTarget">Cible Calories</label>
-                <input type="number" id="cfgCalTarget" name="calTarget" min="1500" max="4500" step="50" value="2200">
+                <input type="number" id="cfgCalTarget" name="calTarget" min="1000" max="4500" step="50" value="2200">
+              </div>
+              <div class="macro-input-group">
+                <label for="cfgWeightKg">Poids (kg)</label>
+                <input type="number" id="cfgWeightKg" name="weightKg" min="30" max="150" step="0.1" value="77.4">
               </div>
               <div class="macro-input-group">
                 <label for="cfgProtTarget">Cible Protéines (g)</label>
-                <input type="number" id="cfgProtTarget" name="protTarget" min="50" max="300" step="5" value="150">
+                <input type="number" id="cfgProtTarget" name="protTarget" min="30" max="300" step="5" value="150">
               </div>
               <div class="macro-input-group">
                 <label for="cfgCarbsTarget">Cible Glucides (g)</label>
-                <input type="number" id="cfgCarbsTarget" name="carbsTarget" min="50" max="600" step="10" value="260">
+                <input type="number" id="cfgCarbsTarget" name="carbsTarget" min="30" max="600" step="10" value="260">
               </div>
               <div class="macro-input-group">
                 <label for="cfgFatTarget">Cible Lipides (g)</label>
-                <input type="number" id="cfgFatTarget" name="fatTarget" min="20" max="150" step="5" value="60">
+                <input type="number" id="cfgFatTarget" name="fatTarget" min="10" max="150" step="5" value="60">
               </div>
             </div>
           </fieldset>
@@ -287,6 +297,6 @@
     </dialog>
   </div>
 
-  <script src="app.js?v=20261021-delete"></script>
+  <script src="app.js?v=20261115-multiprofile"></script>
 </body>
 </html>

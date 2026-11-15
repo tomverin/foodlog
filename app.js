@@ -6,30 +6,68 @@
 (function () {
   'use strict';
 
-  // --- Constants & Default Configuration ---
-  const DEFAULT_CONFIG = {
-    dbUrl: 'https://tom-foodlog-default-rtdb.europe-west1.firebasedatabase.app',
-    secret: 'tom-foodlog-2026',
-    calTarget: 2200,
-    protTarget: 150,
-    carbsTarget: 260,
-    fatTarget: 60,
-    weightKg: 77.4,
+  // --- Constants & Profiles Configuration ---
+  const PROFILES = {
+    tom: {
+      id: 'tom',
+      name: 'Tom',
+      dbUrl: 'https://tom-foodlog-default-rtdb.europe-west1.firebasedatabase.app',
+      secret: 'tom-foodlog-2026',
+      calTarget: 2200,
+      protTarget: 150,
+      carbsTarget: 260,
+      fatTarget: 60,
+      weightKg: 77.4,
+    },
+    murielle: {
+      id: 'murielle',
+      name: 'Murielle',
+      dbUrl: 'https://tom-foodlog-default-rtdb.europe-west1.firebasedatabase.app',
+      secret: 'murielle-foodlog-2026',
+      calTarget: 1800,
+      protTarget: 100,
+      carbsTarget: 180,
+      fatTarget: 50,
+      weightKg: 60.0,
+    },
   };
 
   const STORAGE_KEYS = {
-    CONFIG: 'tom_foodlog_cfg',
+    ACTIVE_PROFILE: 'tom_foodlog_active_profile',
+    CONFIG_PREFIX: 'tom_foodlog_cfg_',
+    LEGACY_CONFIG: 'tom_foodlog_cfg',
     LOCAL_ENTRIES: 'tom_foodlog_local_backup',
+    LOCAL_ENTRIES_PREFIX: 'tom_foodlog_local_backup_',
     PENDING_LOG: 'tom_foodlog_pending_payload',
   };
 
+  function resolveProfile() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const urlUser = (params.get('user') || params.get('profile') || '').toLowerCase().trim();
+      if (urlUser && PROFILES[urlUser]) {
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_PROFILE, urlUser);
+        return urlUser;
+      }
+      const saved = localStorage.getItem(STORAGE_KEYS.ACTIVE_PROFILE);
+      if (saved && PROFILES[saved]) {
+        return saved;
+      }
+    } catch (e) {
+      console.warn('Could not resolve profile from storage/URL', e);
+    }
+    return 'tom';
+  }
+
   // --- State ---
-  let appConfig = loadConfig();
+  let activeProfile = resolveProfile();
+  let appConfig = loadConfig(activeProfile);
   let selectedDate = getTodayIso();
   let currentMeals = [];
   let mealsRequestId = 0;
 
   // --- DOM Elements ---
+  const elProfileSelect = document.getElementById('profileSelect');
   const elConnectionBadge = document.getElementById('connectionBadge');
   const elBtnRefresh = document.getElementById('btnRefresh');
   const elBtnCopyMd = document.getElementById('btnCopyMd');
@@ -88,6 +126,10 @@
   // --- Initialization ---
   function init() {
     bindEvents();
+    if (elProfileSelect) {
+      elProfileSelect.value = activeProfile;
+    }
+    document.title = `Foodlog & Nutrition — ${PROFILES[activeProfile]?.name || 'Tom'}`;
     syncConfigToInputs();
 
     // Check if URL contains publish parameters
@@ -106,25 +148,64 @@
   }
 
   // --- Configuration Management ---
-  function loadConfig() {
+  function loadConfig(profileId) {
+    const pid = profileId || activeProfile || 'tom';
+    const defaultProfile = PROFILES[pid] || PROFILES.tom;
     try {
-      const saved = localStorage.getItem(STORAGE_KEYS.CONFIG);
+      const saved = localStorage.getItem(`${STORAGE_KEYS.CONFIG_PREFIX}${pid}`);
       if (saved) {
-        return { ...DEFAULT_CONFIG, ...JSON.parse(saved) };
+        return { ...defaultProfile, ...JSON.parse(saved) };
+      }
+      if (pid === 'tom') {
+        const legacy = localStorage.getItem(STORAGE_KEYS.LEGACY_CONFIG);
+        if (legacy) {
+          return { ...defaultProfile, ...JSON.parse(legacy) };
+        }
       }
     } catch (e) {
       console.warn('Could not read config from localStorage', e);
     }
-    return { ...DEFAULT_CONFIG };
+    return { ...defaultProfile };
   }
 
-  function saveConfig(newCfg) {
+  function saveConfig(newCfg, profileId) {
+    const pid = profileId || activeProfile || 'tom';
     appConfig = { ...appConfig, ...newCfg };
     try {
-      localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(appConfig));
+      localStorage.setItem(`${STORAGE_KEYS.CONFIG_PREFIX}${pid}`, JSON.stringify(appConfig));
+      if (pid === 'tom') {
+        localStorage.setItem(STORAGE_KEYS.LEGACY_CONFIG, JSON.stringify(appConfig));
+      }
     } catch (e) {
       console.warn('Could not write config to localStorage', e);
     }
+  }
+
+  function switchProfile(newProfileId) {
+    if (!PROFILES[newProfileId]) return;
+    activeProfile = newProfileId;
+    try {
+      localStorage.setItem(STORAGE_KEYS.ACTIVE_PROFILE, newProfileId);
+    } catch (e) {}
+
+    if (elProfileSelect && elProfileSelect.value !== newProfileId) {
+      elProfileSelect.value = newProfileId;
+    }
+    document.title = `Foodlog & Nutrition — ${PROFILES[newProfileId].name}`;
+
+    const url = new URL(window.location.href);
+    if (newProfileId === 'tom') {
+      url.searchParams.delete('user');
+      url.searchParams.delete('profile');
+    } else {
+      url.searchParams.set('user', newProfileId);
+    }
+    window.history.replaceState({}, document.title, url.toString());
+
+    appConfig = loadConfig(newProfileId);
+    syncConfigToInputs();
+    fetchMealsForDate(selectedDate);
+    showToast(`Profil actif : ${PROFILES[newProfileId].name}`, 'info');
   }
 
   function syncConfigToInputs() {
@@ -134,6 +215,8 @@
     document.getElementById('cfgProtTarget').value = appConfig.protTarget;
     document.getElementById('cfgCarbsTarget').value = appConfig.carbsTarget;
     document.getElementById('cfgFatTarget').value = appConfig.fatTarget;
+    const elWeight = document.getElementById('cfgWeightKg');
+    if (elWeight) elWeight.value = appConfig.weightKg || (activeProfile === 'murielle' ? 60.0 : 77.4);
 
     elLblCalTarget.textContent = formatNumber(appConfig.calTarget);
     elLblProtTarget.textContent = appConfig.protTarget;
@@ -239,6 +322,18 @@
 
     const params = new URLSearchParams(search);
 
+    // Profile detection in payload or URL
+    const userParam = (params.get('user') || params.get('profile') || '').toLowerCase().trim();
+    if (userParam && PROFILES[userParam]) {
+      activeProfile = userParam;
+      try {
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_PROFILE, activeProfile);
+      } catch (e) {}
+      appConfig = loadConfig(activeProfile);
+      if (elProfileSelect) elProfileSelect.value = activeProfile;
+      document.title = `Foodlog & Nutrition — ${PROFILES[activeProfile].name}`;
+    }
+
     // Support override of db/token via url if present
     if (params.get('db')) {
       appConfig.dbUrl = params.get('db');
@@ -304,9 +399,12 @@
       const calLabel = isAct ? `-${calories} kcal dépense` : `+${calories} kcal`;
       showToast(`✅ ${getMealLabel(mealType)} enregistré (${calLabel}) !`, 'success');
 
-      // Clean URL query string ONLY after successful sync
-      const cleanUrl = window.location.origin + window.location.pathname;
-      window.history.replaceState({}, document.title, cleanUrl);
+      // Clean URL query string ONLY after successful sync, preserving active profile
+      const cleanUrl = new URL(window.location.origin + window.location.pathname);
+      if (activeProfile !== 'tom') {
+        cleanUrl.searchParams.set('user', activeProfile);
+      }
+      window.history.replaceState({}, document.title, cleanUrl.toString());
       return true;
     } catch (err) {
       console.error('Failed to publish meal:', err);
@@ -612,7 +710,11 @@
   // --- Local Backup Helpers ---
   function getLocalBackups() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEYS.LOCAL_ENTRIES);
+      const key = `${STORAGE_KEYS.LOCAL_ENTRIES_PREFIX}${activeProfile}`;
+      let raw = localStorage.getItem(key);
+      if (!raw && activeProfile === 'tom') {
+        raw = localStorage.getItem(STORAGE_KEYS.LOCAL_ENTRIES);
+      }
       return raw ? JSON.parse(raw) : [];
     } catch {
       return [];
@@ -623,7 +725,11 @@
     const list = getLocalBackups();
     list.push(entry);
     try {
-      localStorage.setItem(STORAGE_KEYS.LOCAL_ENTRIES, JSON.stringify(list));
+      const key = `${STORAGE_KEYS.LOCAL_ENTRIES_PREFIX}${activeProfile}`;
+      localStorage.setItem(key, JSON.stringify(list));
+      if (activeProfile === 'tom') {
+        localStorage.setItem(STORAGE_KEYS.LOCAL_ENTRIES, JSON.stringify(list));
+      }
     } catch (e) {
       console.warn('Local backup failed', e);
     }
@@ -632,7 +738,11 @@
   function removeLocalBackup(id, date) {
     const list = getLocalBackups().filter((m) => m.id !== id || m.date !== date);
     try {
-      localStorage.setItem(STORAGE_KEYS.LOCAL_ENTRIES, JSON.stringify(list));
+      const key = `${STORAGE_KEYS.LOCAL_ENTRIES_PREFIX}${activeProfile}`;
+      localStorage.setItem(key, JSON.stringify(list));
+      if (activeProfile === 'tom') {
+        localStorage.setItem(STORAGE_KEYS.LOCAL_ENTRIES, JSON.stringify(list));
+      }
     } catch (e) {
       console.warn('Local backup update failed', e);
     }
@@ -677,17 +787,18 @@
       const title = m.title ? ` (${m.title})` : '';
       const cal = m.calories || 0;
 
+      const desc = m.text || '';
       if (isActivity(m)) {
         const actName = getMealLabel(m.meal).replace(/^[^\s]+\s+/, '');
         const timePart = m.time ? `${m.time.replace(':', 'h')} - ` : '';
         const prefix = (timePart || m.title) ? ` (${timePart}${m.title || ''})` : '';
-        md += `Dépense ${actName}${prefix} : ${text} (~${cal} kcal).\n`;
+        md += `Dépense ${actName}${prefix} : ${desc} (~${cal} kcal).\n`;
       } else {
         const mealName = capitalizeFirst(m.meal || 'Repas');
         const p = (m.protein || 0).toFixed(1);
         const c = (m.carbs || 0).toFixed(1);
         const f = (m.fat || 0).toFixed(1);
-        md += `${mealName}${title} : ${text} (~${cal} kcal, ${p}g prot, ${c}g gluc, ${f}g lip).\n`;
+        md += `${mealName}${title} : ${desc} (~${cal} kcal, ${p}g prot, ${c}g gluc, ${f}g lip).\n`;
       }
     });
 
@@ -703,6 +814,13 @@
 
   // --- Event Bindings ---
   function bindEvents() {
+    // Profile Switcher
+    if (elProfileSelect) {
+      elProfileSelect.addEventListener('change', (e) => {
+        switchProfile(e.target.value);
+      });
+    }
+
     // Refresh
     elBtnRefresh.addEventListener('click', () => {
       fetchMealsForDate(selectedDate);
@@ -858,16 +976,18 @@
 
     formSettings.addEventListener('submit', (e) => {
       e.preventDefault();
+      const weightVal = parseFloat(document.getElementById('cfgWeightKg')?.value || '') || (activeProfile === 'murielle' ? 60.0 : 77.4);
       const updated = {
         dbUrl: document.getElementById('cfgDbUrl').value.trim(),
         secret: document.getElementById('cfgSecret').value.trim(),
-        calTarget: parseInt(document.getElementById('cfgCalTarget').value, 10) || 2200,
-        protTarget: parseInt(document.getElementById('cfgProtTarget').value, 10) || 150,
-        carbsTarget: parseInt(document.getElementById('cfgCarbsTarget').value, 10) || 260,
-        fatTarget: parseInt(document.getElementById('cfgFatTarget').value, 10) || 60,
+        calTarget: parseInt(document.getElementById('cfgCalTarget').value, 10) || (activeProfile === 'murielle' ? 1800 : 2200),
+        protTarget: parseInt(document.getElementById('cfgProtTarget').value, 10) || (activeProfile === 'murielle' ? 100 : 150),
+        carbsTarget: parseInt(document.getElementById('cfgCarbsTarget').value, 10) || (activeProfile === 'murielle' ? 180 : 260),
+        fatTarget: parseInt(document.getElementById('cfgFatTarget').value, 10) || (activeProfile === 'murielle' ? 50 : 60),
+        weightKg: weightVal,
       };
 
-      saveConfig(updated);
+      saveConfig(updated, activeProfile);
       syncConfigToInputs();
       modalSettings.close();
       showToast('Configuration enregistrée', 'success');
