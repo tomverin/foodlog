@@ -23,7 +23,7 @@
       id: 'murielle',
       name: 'Murielle',
       dbUrl: 'https://tom-foodlog-default-rtdb.europe-west1.firebasedatabase.app',
-      secret: 'murielle-foodlog-2026',
+      secret: 'tom-foodlog-2026',
       calTarget: 1800,
       protTarget: 100,
       carbsTarget: 180,
@@ -362,7 +362,8 @@
     const calories = Math.round(parseFloat(calParam || '0'));
 
     const mealType = normalizeMealType(mealParam || 'lunch');
-    const entryId = `${mealType}_${Date.now()}`;
+    const entryPrefix = activeProfile === 'murielle' ? 'murielle_' : '';
+    const entryId = `${entryPrefix}${mealType}_${Date.now()}`;
 
     const newEntry = {
       id: entryId,
@@ -376,6 +377,7 @@
       protein: isNaN(protParam) ? 0 : protParam,
       carbs: isNaN(carbsParam) ? 0 : carbsParam,
       fat: isNaN(fatParam) ? 0 : fatParam,
+      user: activeProfile,
       synced: false,
     };
 
@@ -472,6 +474,9 @@
       if (data && typeof data === 'object') {
         for (const [id, val] of Object.entries(data)) {
           if (val && typeof val === 'object') {
+            const isMurielle = val.user === 'murielle' || id.startsWith('murielle_');
+            if (activeProfile === 'murielle' && !isMurielle) continue;
+            if (activeProfile === 'tom' && isMurielle) continue;
             meals.push({ id, ...val });
           }
         }
@@ -910,8 +915,9 @@
       const carbsVal = parseFloat(document.getElementById('addMealCarbs').value || '0');
       const fatVal = parseFloat(document.getElementById('addMealFat').value || '0');
 
+      const entryPrefix = activeProfile === 'murielle' ? 'murielle_' : '';
       const entry = {
-        id: `${mealType}_${Date.now()}`,
+        id: `${entryPrefix}${mealType}_${Date.now()}`,
         ts: Math.round(Date.now() / 1000),
         date: dateVal,
         time: timeVal,
@@ -922,6 +928,7 @@
         protein: protVal,
         carbs: carbsVal,
         fat: fatVal,
+        user: activeProfile,
         synced: false,
       };
 
