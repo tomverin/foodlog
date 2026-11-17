@@ -24,9 +24,9 @@
       name: 'Murielle',
       dbUrl: 'https://tom-foodlog-default-rtdb.europe-west1.firebasedatabase.app',
       secret: 'tom-foodlog-2026',
-      calTarget: 1800,
+      calTarget: 1500,
       protTarget: 100,
-      carbsTarget: 180,
+      carbsTarget: 150,
       fatTarget: 50,
       weightKg: 60.0,
     },
@@ -987,9 +987,9 @@
       const updated = {
         dbUrl: document.getElementById('cfgDbUrl').value.trim(),
         secret: document.getElementById('cfgSecret').value.trim(),
-        calTarget: parseInt(document.getElementById('cfgCalTarget').value, 10) || (activeProfile === 'murielle' ? 1800 : 2200),
+        calTarget: parseInt(document.getElementById('cfgCalTarget').value, 10) || (activeProfile === 'murielle' ? 1500 : 2200),
         protTarget: parseInt(document.getElementById('cfgProtTarget').value, 10) || (activeProfile === 'murielle' ? 100 : 150),
-        carbsTarget: parseInt(document.getElementById('cfgCarbsTarget').value, 10) || (activeProfile === 'murielle' ? 180 : 260),
+        carbsTarget: parseInt(document.getElementById('cfgCarbsTarget').value, 10) || (activeProfile === 'murielle' ? 150 : 260),
         fatTarget: parseInt(document.getElementById('cfgFatTarget').value, 10) || (activeProfile === 'murielle' ? 50 : 60),
         weightKg: weightVal,
       };
